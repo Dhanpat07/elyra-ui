@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, Plus, Trash2, Settings, CreditCard, Building2,
-  Globe, Mic, MessageSquare, CheckCircle, AlertCircle,
-  Search, Filter, ChevronRight, Sparkles, Shield,
+  Phone, Plus, Trash2, CreditCard, Building2,
+  Globe, Mic, CheckCircle, AlertCircle,
+  Search, ChevronRight, Sparkles, Shield,
   Zap, Users, TrendingUp, IndianRupee, Clock
 } from 'lucide-react'
 import { cn } from '../lib'
@@ -252,19 +252,19 @@ function AvailableNumberCard({ number, onSelect }: {
 // ─────────────────────────────────────────────────────────
 
 export function TenantPortalPage() {
-  const { profile } = useStore()
   const [activeTab, setActiveTab] = useState<'overview' | 'numbers' | 'config' | 'billing'>('overview')
   const [selectedPlan, setSelectedPlan] = useState('growth')
   const [config, setConfig] = useState<TenantConfig | null>(null)
   const [myNumbers, setMyNumbers] = useState<PhoneNumber[]>([])
   const [availableNumbers, setAvailableNumbers] = useState<AvailableNumber[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loading, setLoading] = useState(true)
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [searchType, setSearchType] = useState('mobile')
   const [searchRegion, setSearchRegion] = useState('')
 
   const API_BASE = import.meta.env.VITE_VOICE_API_URL || 'http://localhost:8000'
-  const tenantId = profile?.tenant_id || 'demo'
+  const tenantId = 'demo'
 
   // Fetch data
   useEffect(() => {

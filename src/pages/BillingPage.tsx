@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   CreditCard,
   Check,
@@ -7,11 +7,12 @@ import {
   Bell,
   TrendingUp,
   Zap,
-  Shield,
   Clock,
   ChevronRight,
-  ExternalLink,
   Loader2,
+  MapPin,
+  IndianRupee,
+  DollarSign,
 } from 'lucide-react';
 
 interface Plan {
@@ -60,6 +61,30 @@ interface Notification {
   read: boolean;
 }
 
+interface PaymentMethod {
+  id: string;
+  name: string;
+  icon: string;
+  popular: boolean;
+}
+
+interface CustomerLocation {
+  country: string;
+  country_name: string;
+  currency: string;
+  payment_provider: string;
+  payment_methods: PaymentMethod[];
+}
+
+interface LocalizedPricing {
+  currency: string;
+  symbol: string;
+  provider: string;
+  plans: {
+    [key: string]: { monthly: number; yearly: number };
+  };
+}
+
 const API_BASE = 'http://localhost:8001';
 
 export default function BillingPage() {
@@ -73,10 +98,52 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [upgradeLoading, setUpgradeLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'plans' | 'usage' | 'invoices' | 'notifications'>('plans');
+  
+  // Geo-based payment state
+  const [customerLocation, setCustomerLocation] = useState<CustomerLocation | null>(null);
+  const [localizedPricing, setLocalizedPricing] = useState<LocalizedPricing | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     loadData();
+    detectLocation();
   }, [tenantId]);
+
+  const detectLocation = async () => {
+    try {
+      // Track customer and detect location
+      const trackRes = await fetch(`${API_BASE}/payments/track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          tenant_id: tenantId,
+          email: `${tenantId}@example.com`,
+        }),
+      });
+      
+      if (trackRes.ok) {
+        const locationData = await trackRes.json();
+        setCustomerLocation(locationData);
+        
+        // Set default payment method
+        const popularMethod = locationData.payment_methods.find((m: PaymentMethod) => m.popular);
+        if (popularMethod) {
+          setSelectedPaymentMethod(popularMethod.id);
+        }
+        
+        // Get localized pricing
+        const pricingRes = await fetch(`${API_BASE}/payments/pricing/${tenantId}`);
+        if (pricingRes.ok) {
+          const pricingData = await pricingRes.json();
+          setLocalizedPricing(pricingData);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to detect location:', error);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -116,45 +183,44 @@ export default function BillingPage() {
   };
 
   const handleUpgrade = async (planName: string) => {
-    if (planName === currentPlan) return;
+    if (planName === currentPlan || planName === 'free') return;
     
     setUpgradeLoading(planName);
+    setCheckoutLoading(true);
+    
     try {
-      // First ensure customer exists
-      await fetch(`${API_BASE}/billing/customers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenant_id: tenantId,
-          email: `${tenantId}@example.com`,
-          name: tenantId,
-        }),
-      });
-
-      // Then create/change subscription
-      const endpoint = currentPlan === 'free' 
-        ? `${API_BASE}/billing/subscriptions`
-        : `${API_BASE}/billing/subscriptions/change-plan`;
-
-      const response = await fetch(endpoint, {
+      // Create checkout with geo-routing
+      const response = await fetch(`${API_BASE}/payments/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenantId,
           plan: planName,
-          new_plan: planName,
           billing_cycle: billingCycle,
         }),
       });
 
       if (response.ok) {
+        const data = await response.json();
+        
+        if (data.provider === 'cashfree' && data.checkout_url) {
+          // Redirect to Cashfree checkout
+          // window.location.href = data.checkout_url;
+          alert(`🇮🇳 Redirecting to Cashfree checkout...\nOrder ID: ${data.order_id}\nAmount: ₹${data.amount.toLocaleString()}`);
+        } else if (data.provider === 'stripe') {
+          // Handle Stripe checkout
+          alert(`🌍 Redirecting to Stripe checkout...\nSubscription: ${data.subscription_id}\nAmount: $${data.amount}`);
+        }
+        
+        // For demo, just update the plan
         setCurrentPlan(planName);
         loadData();
       }
     } catch (error) {
-      console.error('Upgrade failed:', error);
+      console.error('Checkout failed:', error);
     } finally {
       setUpgradeLoading(null);
+      setCheckoutLoading(false);
     }
   };
 
@@ -168,6 +234,37 @@ export default function BillingPage() {
     return new Date(timestamp * 1000).toLocaleDateString();
   };
 
+  const getLocalizedPrice = (planName: string): { monthly: number; yearly: number } => {
+    if (localizedPricing?.plans[planName]) {
+      return localizedPricing.plans[planName];
+    }
+    // Fallback to USD
+    const plan = plans.find(p => p.name === planName);
+    return plan?.pricing || { monthly: 0, yearly: 0 };
+  };
+
+  const getCurrencySymbol = (): string => {
+    return localizedPricing?.symbol || '$';
+  };
+
+  const getProviderBadge = () => {
+    if (!customerLocation) return null;
+    
+    const isIndia = customerLocation.payment_provider === 'cashfree';
+    
+    return (
+      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
+        isIndia ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+      }`}>
+        <MapPin className="w-4 h-4" />
+        <span>{customerLocation.country_name}</span>
+        <span className="text-xs opacity-75">
+          ({isIndia ? 'UPI & Cards via Cashfree' : 'Cards via Stripe'})
+        </span>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -179,11 +276,73 @@ export default function BillingPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Billing & Usage</h1>
-        <p className="mt-2 text-gray-600">
-          Manage your subscription, monitor usage, and view invoices.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Billing & Usage</h1>
+            <p className="mt-2 text-gray-600">
+              Manage your subscription, monitor usage, and view invoices.
+            </p>
+          </div>
+          {/* Location Badge */}
+          {getProviderBadge()}
+        </div>
       </div>
+
+      {/* Payment Provider Info */}
+      {customerLocation && (
+        <div className={`mb-6 p-4 rounded-xl border-2 ${
+          customerLocation.payment_provider === 'cashfree' 
+            ? 'bg-orange-50 border-orange-200' 
+            : 'bg-blue-50 border-blue-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-xl ${
+                customerLocation.payment_provider === 'cashfree'
+                  ? 'bg-orange-100'
+                  : 'bg-blue-100'
+              }`}>
+                {customerLocation.payment_provider === 'cashfree' ? (
+                  <IndianRupee className="w-6 h-6 text-orange-600" />
+                ) : (
+                  <DollarSign className="w-6 h-6 text-blue-600" />
+                )}
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {customerLocation.payment_provider === 'cashfree' 
+                    ? '🇮🇳 Paying from India' 
+                    : '🌍 International Payment'}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {customerLocation.payment_provider === 'cashfree'
+                    ? 'Pay with UPI, NetBanking, or Cards • Lower fees with Cashfree'
+                    : 'Pay with Credit/Debit Card via Stripe'}
+                </p>
+              </div>
+            </div>
+            
+            {/* Payment Methods */}
+            <div className="flex items-center gap-2">
+              {customerLocation.payment_methods.slice(0, 3).map((method) => (
+                <button
+                  key={method.id}
+                  onClick={() => setSelectedPaymentMethod(method.id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedPaymentMethod === method.id
+                      ? 'bg-white shadow-md border-2 border-indigo-500'
+                      : 'bg-white/50 hover:bg-white'
+                  }`}
+                >
+                  <span className="mr-1">{method.icon}</span>
+                  {method.name}
+                  {method.popular && <span className="ml-1 text-xs text-green-600">★</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-8">
@@ -247,7 +406,9 @@ export default function BillingPage() {
           {/* Pricing Cards */}
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan) => {
-              const price = plan.pricing[billingCycle];
+              const localPrice = getLocalizedPrice(plan.name);
+              const price = localPrice[billingCycle];
+              const symbol = getCurrencySymbol();
               const isCurrentPlan = currentPlan === plan.name;
               
               return (
@@ -281,11 +442,20 @@ export default function BillingPage() {
                     <h3 className="text-lg font-semibold text-gray-900">{plan.display_name}</h3>
                     
                     <div className="mt-4 flex items-baseline">
-                      <span className="text-4xl font-bold text-gray-900">${price}</span>
+                      <span className="text-4xl font-bold text-gray-900">
+                        {symbol}{price.toLocaleString()}
+                      </span>
                       <span className="ml-1 text-gray-500">
                         /{billingCycle === 'monthly' ? 'mo' : 'yr'}
                       </span>
                     </div>
+                    
+                    {/* Show original USD price if different currency */}
+                    {localizedPricing?.currency !== 'USD' && plan.name !== 'free' && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        ≈ ${plan.pricing[billingCycle]} USD
+                      </p>
+                    )}
 
                     <ul className="mt-6 space-y-3">
                       {plan.features.slice(0, 6).map((feature, i) => (
@@ -298,9 +468,9 @@ export default function BillingPage() {
 
                     <button
                       onClick={() => handleUpgrade(plan.name)}
-                      disabled={isCurrentPlan || upgradeLoading !== null}
+                      disabled={isCurrentPlan || upgradeLoading !== null || plan.name === 'free'}
                       className={`mt-6 w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-                        isCurrentPlan
+                        isCurrentPlan || plan.name === 'free'
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : plan.recommended
                           ? 'bg-indigo-600 text-white hover:bg-indigo-700'
@@ -311,10 +481,13 @@ export default function BillingPage() {
                         <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                       ) : isCurrentPlan ? (
                         'Current Plan'
-                      ) : currentPlan === 'free' || plans.findIndex(p => p.name === plan.name) > plans.findIndex(p => p.name === currentPlan) ? (
-                        'Upgrade'
+                      ) : plan.name === 'free' ? (
+                        'Free'
                       ) : (
-                        'Downgrade'
+                        <>
+                          {customerLocation?.payment_provider === 'cashfree' ? '📱 ' : '💳 '}
+                          Upgrade with {customerLocation?.payment_provider === 'cashfree' ? 'UPI/Card' : 'Card'}
+                        </>
                       )}
                     </button>
                   </div>
@@ -322,6 +495,27 @@ export default function BillingPage() {
               );
             })}
           </div>
+          
+          {/* Payment Info Footer */}
+          {customerLocation && (
+            <div className="mt-8 text-center text-sm text-gray-500">
+              <p>
+                {customerLocation.payment_provider === 'cashfree' ? (
+                  <>
+                    🔒 Secure payment powered by <strong>Cashfree</strong> • 
+                    UPI, NetBanking, Cards accepted • 
+                    Prices in <strong>INR (₹)</strong>
+                  </>
+                ) : (
+                  <>
+                    🔒 Secure payment powered by <strong>Stripe</strong> • 
+                    All major cards accepted • 
+                    Prices in <strong>USD ($)</strong>
+                  </>
+                )}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -369,11 +563,11 @@ export default function BillingPage() {
                 
                 <div className="mb-2">
                   <span className="text-2xl font-bold text-gray-900">
-                    {metric.isCurrency ? `$${metric.used.toFixed(2)}` : formatNumber(metric.used)}
+                    {metric.isCurrency ? `${getCurrencySymbol()}${metric.used.toFixed(2)}` : formatNumber(metric.used)}
                   </span>
                   <span className="text-gray-500 text-sm">
                     {' / '}
-                    {metric.isCurrency ? `$${metric.limit}` : formatNumber(metric.limit)}
+                    {metric.isCurrency ? `${getCurrencySymbol()}${metric.limit}` : formatNumber(metric.limit)}
                   </span>
                 </div>
 
@@ -455,7 +649,7 @@ export default function BillingPage() {
                       {formatDate(invoice.created)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      ${(invoice.amount / 100).toFixed(2)} {invoice.currency.toUpperCase()}
+                      {getCurrencySymbol()}{(invoice.amount / 100).toFixed(2)} {invoice.currency.toUpperCase()}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

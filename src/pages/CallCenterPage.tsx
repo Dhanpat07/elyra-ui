@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import { cn, formatMs } from '../lib'
 import { StatCard } from '../components/StatCard'
-import { useStore } from '../store'
 
 // Types
 interface Room {
@@ -229,7 +228,6 @@ function AlertItem({ alert }: { alert: { level: string; message: string; timesta
 }
 
 export function CallCenterPage() {
-  const { profile } = useStore()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
@@ -240,7 +238,7 @@ export function CallCenterPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const tenantId = profile?.tenant_id || 'demo'
+      const tenantId = 'demo'
       
       // Fetch dashboard stats
       const statsRes = await fetch(`${API_BASE}/dashboard?tenant_id=${tenantId}`)
@@ -262,7 +260,7 @@ export function CallCenterPage() {
     } finally {
       setLoading(false)
     }
-  }, [API_BASE, profile?.tenant_id])
+  }, [API_BASE])
 
   useEffect(() => {
     fetchData()

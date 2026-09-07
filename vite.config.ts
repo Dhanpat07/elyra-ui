@@ -1,8 +1,14 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   server: {
     port: 5173,
     strictPort: false,
@@ -34,9 +40,18 @@ export default defineConfig({
           proxy.on('error', () => {})
         },
       },
-      // Bridge WebSocket — port 8002
+      // LAALI API — port 8000 (same as voice-agent for now)
+      '/laali-api': {
+        target:       'http://localhost:8000',
+        changeOrigin: true,
+        rewrite:      (p) => p.replace(/^\/laali-api/, '/api'),
+        configure: (proxy) => {
+          proxy.on('error', () => {})
+        },
+      },
+      // Bridge WebSocket — port 8002 (BYPASSED - direct to voice agent)
       '/ws': {
-        target:       'ws://localhost:8002',
+        target:       'ws://localhost:8000',
         ws:           true,
         changeOrigin: true,
         configure: (proxy) => {

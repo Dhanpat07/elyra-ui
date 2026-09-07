@@ -11,8 +11,12 @@ const stateConfig: Record<VoiceState, { label: string; color: string; ring: stri
   BARGE_IN:    { label: 'Barge-in',    color: 'bg-purple-500/20 text-purple-400',  ring: 'ring-purple-500/40',  pulse: true },
 }
 
+// Default fallback for unknown states
+const defaultConfig = { label: 'Unknown', color: 'bg-slate-500/20 text-slate-400', ring: 'ring-slate-500/30', pulse: false }
+
 export function VoiceStateBadge({ state }: { state: VoiceState }) {
-  const cfg = stateConfig[state]
+  const cfg = stateConfig[state] || defaultConfig
+  
   return (
     <motion.span
       key={state}

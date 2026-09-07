@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-08-28T17:27:29.085Z",
+  "baseUrl": "http://localhost:5173",
+  "maxFileSizeMB": 5,
+  "screenshots": [
+    {
+      "page": "home",
+      "viewport": "mobile",
+      "path": "/Users/apple/Documents/elyra/elyra-ui/scripts/screenshots/home_mobile.png",
+      "url": "http://localhost:5173/",
+      "errors": []
+    },
+    {
+      "page": "laali",
+      "viewport": "mobile",
+      "path": "/Users/apple/Documents/elyra/elyra-ui/scripts/screenshots/laali_mobile.png",
+      "url": "http://localhost:5173/laali",
+      "errors": []
+    },
+    {
+      "page": "home",
+      "viewport": "tablet",
+      "path": "/Users/apple/Documents/elyra/elyra-ui/scripts/screenshots/home_tablet.png",
+      "url": "http://localhost:5173/",
+      "errors": []
+    },
+    {
+      "page": "laali",
+      "viewport": "tablet",
+      "path": "/Users/apple/Documents/elyra/elyra-ui/scripts/screenshots/laali_tablet.png",
+      "url": "http://localhost:5173/laali",
+      "errors": []
+    },
+    {
+      "page": "home",
+      "viewport": "desktop",
+      "path": "/Users/apple/Documents/elyra/elyra-ui/scripts/screenshots/home_desktop.png",
+      "url": "http://localhost:5173/",
+      "errors": []
+    },
+    {
+      "page": "laali",
+      "viewport": "desktop",
+      "path": "/Users/apple/Documents/elyra/elyra-ui/scripts/screenshots/laali_desktop.png",
+      "url": "http://localhost:5173/laali",
+      "errors": []
+    }
+  ]
+}
