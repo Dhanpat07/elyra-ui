@@ -1,78 +1,95 @@
-import { useEffect } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Toaster } from 'sonner'
-import { Loader2 } from 'lucide-react'
-import { Sidebar }       from './components/Sidebar'
-import { UserMenu }      from './components/UserMenu'
-import { AuthPage }      from './pages/AuthPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { TenantPortalPage } from './pages/TenantPortalPage'
-import { CallCenterPage } from './pages/CallCenterPage'
-import BillingPage from './pages/BillingPage'
-import DataConnectorsPage from './pages/DataConnectorsPage'
-import { VoicePage }     from './pages/VoicePage'
-import { RAGPage }       from './pages/RAGPage'
-import { MetricsPage }   from './pages/MetricsPage'
-import { SettingsPage }  from './pages/SettingsPage'
-import { useStore }      from './store'
-import { useAuth }       from './hooks/useAuth'
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Toaster } from 'sonner';
 
-const PAGE_TITLES: Record<string, string> = {
-  dashboard:  'Dashboard',
-  portal:     'My Platform',
-  callcenter: 'Call Center',
-  billing:    'Billing & Usage',
-  connectors: 'Data Connectors',
-  voice:      'Voice Agent',
-  rag:        'RAG Engine',
-  metrics:    'Metrics',
-  settings:   'Settings',
-}
+// Contexts
+import { AuthProvider, useAuthContext } from './contexts/AuthContext';
 
-export default function App() {
-  const { activePage } = useStore()
-  const { user, initialized, init, profile } = useAuth()
+// Components
+import { Sidebar } from './components/SidebarLaali';
+import { TopBar } from './components/TopBar';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { LaaliLogoAnimated } from './components/LaaliLogo';
 
-  useEffect(() => { init() }, [])
+// Pages
+import { AuthPage } from './pages/AuthPageLaali';
+import { DashboardPage } from './pages/DashboardNew';
+import { OnboardingPage } from './pages/OnboardingPage';
+import { VoiceAgentsPage } from './pages/VoiceAgentsPage';
+import { CallAnalyticsPage } from './pages/CallAnalyticsPage';
+import DataConnectorsPage from './pages/DataConnectorsPage';
+import BillingPage from './pages/BillingPageNew';
+import { SettingsPage } from './pages/SettingsNew';
+import { VoicePage } from './pages/VoicePage';
+import { RAGPage } from './pages/RAGPage';
+import { AdminDashboardPage, ADMIN_EMAIL } from './pages/AdminDashboardPage';
+import { LaaliChatPage } from './pages/LaaliChatPage';
+import PhoneNumbersPage from './pages/PhoneNumbersPage';
 
-  // Loading splash
-  if (!initialized) {
-    return (
-      <div className="min-h-screen bg-surface-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={28} className="text-brand-400 animate-spin" />
-          <p className="text-sm text-slate-500">Loading Elyra…</p>
-        </div>
-      </div>
-    )
+// Store
+import { useStore } from './store';
+
+// Page configuration - Updated for LAALI
+const PAGES: Record<string, { title: string; description: string }> = {
+  dashboard:    { title: 'Dashboard',       description: 'Your LAALI voice AI overview' },
+  onboarding:   { title: 'Get Started',     description: 'Connect. Choose. Deploy. — 3 minutes' },
+  agents:       { title: 'Voice Agents',    description: 'Manage your AI voice agents' },
+  phones:       { title: 'Phone Numbers',   description: 'Buy and manage phone numbers' },
+  analytics:    { title: 'Call Analytics',  description: 'Insights and performance metrics' },
+  connectors:   { title: 'Data Sources',    description: 'Connect your data for voice AI' },
+  laali:        { title: 'LAALI Chat',      description: 'Ask questions about LAALI AI platform' },
+  billing:      { title: 'Billing & Usage', description: 'Plans, usage, and invoices' },
+  settings:     { title: 'Settings',        description: 'Account and organization settings' },
+  voice:        { title: 'Voice Console',   description: 'Real-time voice testing' },
+  rag:          { title: 'RAG Engine',      description: 'Retrieval augmented generation' },
+  admin:        { title: 'Admin Dashboard', description: 'LAALI Platform Management' },
+};
+
+// Protected App Content
+function AppContent() {
+  const { user, profile, initialized } = useAuthContext();
+  const { activePage, setActivePage } = useStore();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // DEV MODE: Allow ?dev=true to bypass auth for UI testing
+  const isDev = new URLSearchParams(window.location.search).get('dev') === 'true';
+
+  // Check if user needs onboarding
+  const needsOnboarding = profile ? !profile.onboarding_completed : false;
+
+  // Redirect to onboarding if needed
+  useEffect(() => {
+    if (needsOnboarding && activePage !== 'onboarding' && !isDev) {
+      setActivePage('onboarding');
+    }
+  }, [needsOnboarding, activePage, setActivePage, isDev]);
+
+  // Show auth page if not logged in (no loading screen) - bypass if dev mode
+  if (!isDev && (!initialized || !user)) {
+    return <AuthPage />;
   }
 
-  // Not logged in → show auth page
-  if (!user) return <AuthPage />
+  // Get current page info
+  const pageInfo = PAGES[activePage] || PAGES.dashboard;
 
   return (
-    <div className="flex min-h-screen bg-grid-pattern">
-      <Sidebar />
+    <div className="flex min-h-screen bg-surface-900 bg-grid-pattern">
+      {/* Sidebar */}
+      <Sidebar 
+        collapsed={sidebarCollapsed} 
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        needsOnboarding={needsOnboarding}
+      />
 
+      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-3.5 border-b border-white/[0.05] bg-surface-900/80 backdrop-blur-xl">
-          <div>
-            <h1 className="text-base font-bold text-white">{PAGE_TITLES[activePage]}</h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {profile?.tenant_id ?? 'demo'} · Elyra Platform
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs text-slate-500">Live</span>
-            </div>
-            <UserMenu />
-          </div>
-        </header>
+        {/* Top Bar */}
+        <TopBar 
+          title={pageInfo.title}
+          description={pageInfo.description}
+        />
 
-        {/* Page content */}
+        {/* Page Content */}
         <main className="flex-1 p-6 overflow-auto">
           <AnimatePresence mode="wait">
             <motion.div
@@ -82,26 +99,47 @@ export default function App() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
             >
-              {activePage === 'dashboard'  && <DashboardPage />}
-              {activePage === 'portal'     && <TenantPortalPage />}
-              {activePage === 'callcenter' && <CallCenterPage />}
-              {activePage === 'billing'    && <BillingPage />}
+              {activePage === 'dashboard' && <DashboardPage />}
+              {activePage === 'onboarding' && <OnboardingPage />}
+              {activePage === 'agents' && <VoiceAgentsPage />}
+              {activePage === 'phones' && <PhoneNumbersPage />}
+              {activePage === 'analytics' && <CallAnalyticsPage />}
               {activePage === 'connectors' && <DataConnectorsPage />}
-              {activePage === 'voice'      && <VoicePage />}
-              {activePage === 'rag'        && <RAGPage />}
-              {activePage === 'metrics'    && <MetricsPage />}
-              {activePage === 'settings'   && <SettingsPage />}
+              {activePage === 'laali' && <LaaliChatPage />}
+              {activePage === 'billing' && <BillingPage />}
+              {activePage === 'settings' && <SettingsPage />}
+              {activePage === 'voice' && <VoicePage />}
+              {activePage === 'rag' && <RAGPage />}
+              {activePage === 'admin' && profile?.email === ADMIN_EMAIL && <AdminDashboardPage />}
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
 
+      {/* Toast Notifications - LAALI themed */}
       <Toaster
         theme="dark"
+        position="bottom-right"
         toastOptions={{
-          style: { background: '#13131f', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }
+          style: {
+            background: '#1a1a2e',
+            border: '1px solid rgba(255, 107, 107, 0.1)',
+            color: '#e2e8f0',
+          },
+          className: 'shadow-xl',
         }}
       />
     </div>
-  )
+  );
+}
+
+// Main App with Provider
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
+  );
 }
